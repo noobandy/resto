@@ -23,7 +23,7 @@
     <uib-alert data-ng-repeat="alert in alerts" type="{{alert.type}}" close="closeAlert($index)">{{alert.message}}</uib-alert>
     <div class="list-group">
         <div data-ng-repeat="restaurant in restaurants">
-            <a class="col-md-4 list-group-item" data-ui-sref="restaurant details({id : restaurant._id})">
+            <a class="col-md-4 list-group-item" data-ui-sref="restaurant details({id : restaurant.id})">
                 <h4 class="list-group-item-heading" data-ng-bind="restaurant.name">
                 </h4>
 
