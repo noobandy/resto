@@ -5,12 +5,26 @@
 		http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-3.1.xsd">
 
 	<context:component-scan base-package="in.anandm.restaurant" />
-	
+
 	<bean class="com.mongodb.MongoClientURI" id="mongoClientURI">
 		<constructor-arg name="uri"
 			value="mongodb://localhost/restaurants-db" />
 	</bean>
 	<bean id="mongoClient" class="com.mongodb.MongoClient">
 		<constructor-arg name="uri" ref="mongoClientURI" />
+	</bean>
+
+	<bean id="morphia" class="org.mongodb.morphia.Morphia">
+		<constructor-arg name="classesToMap">
+			<set>
+				<value>in.anandm.restaurant.Restaurant</value>
+			</set>
+		</constructor-arg>
+	</bean>
+
+	<bean id="restaurantDataStore" factory-bean="morphia"
+		factory-method="createDatastore" init-method="ensureIndexes">
+		<constructor-arg name="mongoClient" ref="mongoClient" />
+		<constructor-arg name="dbName" value="restaurants-db" />
 	</bean>
 </beans>

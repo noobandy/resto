@@ -1,8 +1,16 @@
 package in.anandm.restaurant;
 
+import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 
-import org.bson.Document;
+import org.bson.types.ObjectId;
+import org.mongodb.morphia.Datastore;
+import org.mongodb.morphia.aggregation.AggregationPipeline;
+import org.mongodb.morphia.aggregation.GeoNear;
+import org.mongodb.morphia.aggregation.Projection;
+import org.mongodb.morphia.aggregation.Sort;
+import org.mongodb.morphia.query.Query;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -22,6 +30,9 @@ public class RestaurantsController {
     @Autowired
     private IRestaurantDAO restaurantDAO;
 
+    @Autowired
+    private Datastore restaurantDataStore;
+
     @RequestMapping(value = "/", method = RequestMethod.GET)
     public String home() {
         return "home";
@@ -29,45 +40,71 @@ public class RestaurantsController {
 
     @RequestMapping(value = "/restaurants", method = RequestMethod.GET)
     public @ResponseBody
-    ResponseEntity<List<Document>> findNearestRestaurnats(@RequestParam(
-                                                                  value = "lat",
-                                                                  required = true) double lat,
-                                                          @RequestParam(
-                                                                  value = "lng",
-                                                                  required = true) double lng,
-                                                          @RequestParam(
-                                                                  value = "maxDistance",
-                                                                  required = false) Double maxDistance,
-                                                          @RequestParam(
-                                                                  value = "page",
-                                                                  required = false) Integer page,
-                                                          @RequestParam(
-                                                                  value = "pageSize",
-                                                                  required = false) Integer pageSize) {
+    ResponseEntity<List<Restaurant>> findNearestRestaurnats(@RequestParam(
+                                                                    value = "lat",
+                                                                    required = true) double lat,
+                                                            @RequestParam(
+                                                                    value = "lng",
+                                                                    required = true) double lng,
+                                                            @RequestParam(
+                                                                    value = "maxDistance",
+                                                                    required = false) Double maxDistance,
+                                                            @RequestParam(
+                                                                    value = "page",
+                                                                    required = false) Integer page,
+                                                            @RequestParam(
+                                                                    value = "pageSize",
+                                                                    required = false) Integer pageSize) {
 
         maxDistance = maxDistance != null ? maxDistance : 500;
         page = page != null ? page : 1;
         pageSize = pageSize != null ? pageSize : 20;
+        AggregationPipeline aggregationPipeline = restaurantDataStore
+                .createAggregation(Restaurant.class);
+        Iterator<Restaurant> iterator = aggregationPipeline
+                .geoNear(
+                        GeoNear.builder("distance").setMaxDistance(maxDistance)
+                                .setNear(lat, lng).setSpherical(true).build())
+                .project(
+                        Projection.projection("restaurant_id"),
+                        Projection.projection("name"),
+                        Projection.projection("borough"),
+                        Projection.projection("cuisine"),
+                        Projection.projection("address"),
+                        Projection.projection("distance"),
+                        Projection.projection(
+                                "averageScore",
+                                Projection.expression("$avg", "$grades.score")))
+                .sort(new Sort("averageScore", -1)).skip((page - 1) * pageSize)
+                .limit(pageSize).aggregate(Restaurant.class);
 
-        List<Document> foundRestaurants = restaurantDAO.findNearestRestaurants(
-                lat, lng, maxDistance, page, pageSize);
+        List<Restaurant> foundRestaurants = new ArrayList<Restaurant>();
 
-        return new ResponseEntity<List<Document>>(foundRestaurants,
+        while (iterator.hasNext()) {
+            foundRestaurants.add(iterator.next());
+        }
+
+        return new ResponseEntity<List<Restaurant>>(foundRestaurants,
                 HttpStatus.OK);
     }
 
     @RequestMapping(value = "/restaurants/{id}", method = RequestMethod.GET)
     public @ResponseBody
-    ResponseEntity<Document> findOneRestaurant(@PathVariable(value = "id") String id) {
+    ResponseEntity<Restaurant> findOneRestaurant(@PathVariable(value = "id") String id) {
 
-        Document foundRestaurant = restaurantDAO.findById(id);
+        Query<Restaurant> query = restaurantDataStore
+                .createQuery(Restaurant.class);
+        query.field("id").equal(new ObjectId(id));
+
+        Restaurant foundRestaurant = query.get();
+
         if (foundRestaurant == null) {
-            return new ResponseEntity<Document>(HttpStatus.NOT_FOUND);
+            return new ResponseEntity<Restaurant>(HttpStatus.NOT_FOUND);
         }
         else {
-            return new ResponseEntity<Document>(foundRestaurant, HttpStatus.OK);
+            return new ResponseEntity<Restaurant>(foundRestaurant,
+                    HttpStatus.OK);
         }
 
     }
-
 }

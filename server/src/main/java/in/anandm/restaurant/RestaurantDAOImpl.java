@@ -11,7 +11,6 @@ import org.springframework.stereotype.Service;
 
 import com.mongodb.MongoClient;
 import com.mongodb.client.MongoCollection;
-import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.geojson.Geometry;
 import com.mongodb.client.model.geojson.Point;
@@ -91,7 +90,9 @@ public class RestaurantDAOImpl implements IRestaurantDAO {
          * aggregatePipeline.add(limit);
          */
 
-        MongoCursor<Document> cursor = restaurants
+        List<Document> foundRestaurants = new ArrayList<Document>();
+
+        foundRestaurants = restaurants
                 .aggregate(
                         Arrays.asList(
                                 new Document("$geoNear", new Document("near",
@@ -113,13 +114,9 @@ public class RestaurantDAOImpl implements IRestaurantDAO {
                                 new Document("$sort", new Document(
                                         "averageScore", -1)), new Document(
                                         "$skip", (page - 1) * pageSize),
-                                new Document("$limit", pageSize))).iterator();
+                                new Document("$limit", pageSize))).into(
+                        foundRestaurants);
 
-        List<Document> foundRestaurants = new ArrayList<Document>();
-
-        while (cursor.hasNext()) {
-            foundRestaurants.add(cursor.next());
-        }
         return foundRestaurants;
     }
 
